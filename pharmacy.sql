@@ -1,527 +1,268 @@
+SET FOREIGN_KEY_CHECKS = 0;
 
+DROP TABLE IF EXISTS sales_items;
+DROP TABLE IF EXISTS sales;
+DROP TABLE IF EXISTS purchase;
+DROP TABLE IF EXISTS meds;
+DROP TABLE IF EXISTS suppliers;
+DROP TABLE IF EXISTS emplogin;
+DROP TABLE IF EXISTS employee;
+DROP TABLE IF EXISTS admin;
+DROP TABLE IF EXISTS customer;
 
-SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
-SET AUTOCOMMIT = 0;
-START TRANSACTION;
-SET time_zone = "+00:00";
+SET FOREIGN_KEY_CHECKS = 1;
 
+CREATE TABLE suppliers (
+  Sup_ID INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  Sup_Name VARCHAR(100) NOT NULL,
+  Sup_Add VARCHAR(255),
+  Sup_Phone VARCHAR(20),
+  Sup_Mail VARCHAR(100)
+) ENGINE=InnoDB;
 
-/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
-/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
-/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
-/*!40101 SET NAMES utf8mb4 */;
+CREATE TABLE meds (
+  Med_ID INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  Med_Name VARCHAR(150) NOT NULL,
+  Med_Qty INT NOT NULL DEFAULT 0,
+  Category VARCHAR(50),
+  Med_Price DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+  Location_Rack VARCHAR(50)
+) ENGINE=InnoDB;
 
---
--- Database: `pharmacy`
---
+CREATE TABLE customer (
+  C_ID INT NOT NULL PRIMARY KEY,
+  C_Fname VARCHAR(100),
+  C_Lname VARCHAR(100),
+  C_Age INT,
+  C_Sex CHAR(1),
+  C_Phno VARCHAR(20),
+  C_Mail VARCHAR(100)
+) ENGINE=InnoDB;
+
+CREATE TABLE employee (
+  E_ID INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  E_Fname VARCHAR(100),
+  E_Lname VARCHAR(100),
+  E_Bdate DATE,
+  E_Age INT,
+  E_Sex CHAR(1),
+  E_Type VARCHAR(50),
+  E_Date DATE,
+  E_Add VARCHAR(255),
+  E_Mail VARCHAR(100),
+  E_Phone VARCHAR(20),
+  E_Sal DECIMAL(10,2)
+) ENGINE=InnoDB;
+
+CREATE TABLE emplogin (
+  E_Username VARCHAR(80) PRIMARY KEY,
+  E_Password VARCHAR(255) NOT NULL,
+  E_ID INT,
+  FOREIGN KEY (E_ID) REFERENCES employee(E_ID)
+      ON DELETE SET NULL ON UPDATE CASCADE
+) ENGINE=InnoDB;
+
+CREATE TABLE admin (
+  A_Username VARCHAR(80) PRIMARY KEY,
+  A_Password VARCHAR(255) NOT NULL
+) ENGINE=InnoDB;
+
+CREATE TABLE purchase (
+  P_ID INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  Med_ID INT NOT NULL,
+  Sup_ID INT,
+  P_Qty INT NOT NULL,
+  P_Cost DECIMAL(10,2),
+  P_Date DATE,
+  Mfg_Date DATE,
+  Exp_Date DATE,
+  FOREIGN KEY (Med_ID) REFERENCES meds(Med_ID)
+      ON DELETE CASCADE ON UPDATE CASCADE,
+  FOREIGN KEY (Sup_ID) REFERENCES suppliers(Sup_ID)
+      ON DELETE SET NULL ON UPDATE CASCADE
+) ENGINE=InnoDB;
+
+CREATE TABLE sales (
+  SALE_ID INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  S_Date DATE DEFAULT (CURRENT_DATE),
+  S_Time TIME DEFAULT (CURRENT_TIME),
+  TOTAL_AMT DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+  C_ID INT,
+  E_ID INT,
+  FOREIGN KEY (C_ID) REFERENCES customer(C_ID)
+        ON DELETE SET NULL ON UPDATE CASCADE,
+  FOREIGN KEY (E_ID) REFERENCES employee(E_ID)
+        ON DELETE SET NULL ON UPDATE CASCADE
+) ENGINE=InnoDB;
+
+CREATE TABLE sales_items (
+  SALE_ITEM_ID INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  SALE_ID INT NOT NULL,
+  MED_ID INT NOT NULL,
+  SALE_QTY INT NOT NULL DEFAULT 1,
+  TOT_PRICE DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+  FOREIGN KEY (SALE_ID) REFERENCES sales(SALE_ID)
+        ON DELETE CASCADE ON UPDATE CASCADE,
+  FOREIGN KEY (MED_ID) REFERENCES meds(Med_ID)
+        ON DELETE RESTRICT ON UPDATE CASCADE
+) ENGINE=InnoDB;
+
+CREATE INDEX idx_sales_CID ON sales (C_ID);
+CREATE INDEX idx_sales_EID ON sales (E_ID);
+CREATE INDEX idx_sales_items_sale ON sales_items (SALE_ID);
+CREATE INDEX idx_sales_items_med ON sales_items (MED_ID);
 
 DELIMITER $$
---
--- Procedures
---
-CREATE DEFINER=`root`@`localhost` PROCEDURE `EXPIRY` ()  NO SQL
+DROP FUNCTION IF EXISTS fn_sale_total $$
+CREATE FUNCTION fn_sale_total(p_sale_id INT)
+RETURNS DECIMAL(12,2)
+DETERMINISTIC
 BEGIN
-SELECT p_id,sup_id,med_id,p_qty,p_cost,pur_date,mfg_date,exp_date FROM purchase where exp_date between CURDATE() and DATE_SUB(CURDATE(), INTERVAL -6 MONTH);
-END$$
+  DECLARE v_total DECIMAL(12,2) DEFAULT 0.00;
+  SELECT COALESCE(SUM(TOT_PRICE),0.00) INTO v_total
+  FROM sales_items WHERE SALE_ID = p_sale_id;
+  RETURN v_total;
+END $$
+DELIMITER ;
 
-CREATE DEFINER=`root`@`localhost` PROCEDURE `SEARCH_INVENTORY` (IN `search` VARCHAR(255))  NO SQL
+DELIMITER $$
+DROP TRIGGER IF EXISTS trg_si_bi_set_tot_price $$
+CREATE TRIGGER trg_si_bi_set_tot_price
+BEFORE INSERT ON sales_items
+FOR EACH ROW
 BEGIN
-DECLARE mid DECIMAL(6);
-DECLARE mname VARCHAR(50);
-DECLARE mqty INT;
-DECLARE mcategory VARCHAR(20);
-DECLARE mprice DECIMAL(6,2);
-DECLARE location VARCHAR(30);
-DECLARE exit_loop BOOLEAN DEFAULT FALSE;
-DECLARE MED_CURSOR CURSOR FOR SELECT MED_ID,MED_NAME,MED_QTY,CATEGORY,MED_PRICE,LOCATION_RACK FROM MEDS;
-DECLARE CONTINUE HANDLER FOR NOT FOUND SET exit_loop=TRUE;
-CREATE TEMPORARY TABLE IF NOT EXISTS T1 (medid decimal(6),medname varchar(50),medqty int,medcategory varchar(20),medprice decimal(6,2),medlocation varchar(30));
-OPEN MED_CURSOR;
-med_loop: LOOP
-FETCH FROM MED_CURSOR INTO mid,mname,mqty,mcategory,mprice,location;
-IF exit_loop THEN
-LEAVE med_loop;
-END IF;
+  DECLARE v_price DECIMAL(10,2);
+  SELECT Med_Price INTO v_price FROM meds WHERE Med_ID = NEW.MED_ID;
+  SET NEW.TOT_PRICE = COALESCE(v_price,0.00) * NEW.SALE_QTY;
+END $$
+DELIMITER ;
 
-IF(CONCAT(mid,mname,mcategory,location) LIKE CONCAT('%',search,'%')) THEN
-INSERT INTO T1(medid,medname,medqty,medcategory,medprice,medlocation)
-VALUES(mid,mname,mqty,mcategory,mprice,location);
-END IF;
-END LOOP med_loop;
-CLOSE MED_CURSOR;
-SELECT medid,medname,medqty,medcategory,medprice,medlocation FROM T1; 
-END$$
-
-CREATE DEFINER=`root`@`localhost` PROCEDURE `STOCK` ()  NO SQL
+DELIMITER $$
+DROP TRIGGER IF EXISTS trg_si_ai_update_stock_total $$
+CREATE TRIGGER trg_si_ai_update_stock_total
+AFTER INSERT ON sales_items
+FOR EACH ROW
 BEGIN
-SELECT med_id, med_name,med_qty,category,med_price,location_rack FROM meds where med_qty<=50;
-END$$
+  UPDATE meds SET Med_Qty = GREATEST(Med_Qty - NEW.SALE_QTY, 0)
+    WHERE Med_ID = NEW.MED_ID;
+  UPDATE sales SET TOTAL_AMT = fn_sale_total(NEW.SALE_ID)
+    WHERE SALE_ID = NEW.SALE_ID;
+END $$
+DELIMITER ;
 
-CREATE DEFINER=`root`@`localhost` PROCEDURE `TOTAL_AMT` (IN `ID` INT, OUT `AMT` DECIMAL(8,2))  NO SQL
+DELIMITER $$
+DROP TRIGGER IF EXISTS trg_si_ad_restore_stock_total $$
+CREATE TRIGGER trg_si_ad_restore_stock_total
+AFTER DELETE ON sales_items
+FOR EACH ROW
 BEGIN
-UPDATE SALES SET S_DATE=SYSDATE(),S_TIME=CURRENT_TIMESTAMP(),TOTAL_AMT=(SELECT SUM(TOT_PRICE) FROM SALES_ITEMS WHERE SALES_ITEMS.SALE_ID=ID) WHERE SALES.SALE_ID=ID;
-SELECT TOTAL_AMT INTO AMT FROM SALES WHERE SALE_ID=ID;
-END$$
-
---
--- Functions
---
-CREATE DEFINER=`root`@`localhost` FUNCTION `P_AMT` (`start` DATE, `end` DATE) RETURNS DECIMAL(8,2) NO SQL
-    DETERMINISTIC
-BEGIN
-DECLARE PAMT DECIMAL(8,2) DEFAULT 0.0;
-SELECT SUM(P_COST) INTO PAMT FROM PURCHASE WHERE PUR_DATE >= start AND PUR_DATE<= end;
-RETURN PAMT;
-END$$
-
-CREATE DEFINER=`root`@`localhost` FUNCTION `S_AMT` (`start` DATE, `end` DATE) RETURNS DECIMAL(8,2) NO SQL
-BEGIN
-DECLARE SAMT DECIMAL(8,2) DEFAULT 0.0;
-SELECT SUM(TOTAL_AMT) INTO SAMT FROM SALES WHERE S_DATE >= start AND S_DATE<= end;
-RETURN SAMT;
-END$$
-
+  UPDATE meds SET Med_Qty = Med_Qty + OLD.SALE_QTY
+    WHERE Med_ID = OLD.MED_ID;
+  UPDATE sales SET TOTAL_AMT = fn_sale_total(OLD.SALE_ID)
+    WHERE SALE_ID = OLD.SALE_ID;
+END $$
 DELIMITER ;
 
--- --------------------------------------------------------
+INSERT INTO admin VALUES ('admin','admin123'), ('owner','ownerpass');
+
+INSERT INTO suppliers (Sup_Name, Sup_Add, Sup_Phone, Sup_Mail) VALUES
+('MedSup Pvt Ltd', 'Bengaluru', '9000000100','sales@medsup.com'),
+('Healix Pharmaceuticals', 'Mumbai', '9000000200','contact@healix.in'),
+('Sunrise Pharma', 'Chennai', '9000000300','sales@sunrisepharma.com'),
+('GlobalMeds Distributors', 'Delhi', '9000000400','orders@globalmeds.com'),
+('Apex Healthcare', 'Hyderabad', '9000000500','support@apexhealth.com'),
+('BioCare Suppliers', 'Kolkata', '9000000600','info@biocare.co');
+
+INSERT INTO meds (Med_Name, Med_Qty, Category, Med_Price, Location_Rack) VALUES
+('Dolo 650 MG', 625, 'Tablet', 1.00, 'A1'),
+('Panadol Cold & Flu', 90, 'Tablet', 2.50, 'A1'),
+('Livogen', 25, 'Capsule', 5.00, 'B2'),
+('Gelusil', 440, 'Tablet', 1.25, 'A3'),
+('Cyclopam', 93, 'Tablet', 6.00, 'A2'),
+('Paracetamol 500mg', 1200, 'Tablet', 0.75, 'A1'),
+('Amoxicillin 500mg', 350, 'Capsule', 4.50, 'B1'),
+('Cefixime 200mg', 150, 'Tablet', 7.00, 'B3'),
+('Metformin 500mg', 420, 'Tablet', 3.00, 'C1'),
+('Glibenclamide 5mg', 210, 'Tablet', 1.80, 'C1'),
+('Omeprazole 20mg', 300, 'Capsule', 6.50, 'A4'),
+('Cetirizine 10mg', 780, 'Tablet', 0.90, 'A2'),
+('Azithromycin 250mg', 200, 'Tablet', 12.00, 'B2'),
+('Vitamin C 500mg', 500, 'Tablet', 0.50, 'D1'),
+('Calpol Suspension', 80, 'Syrup', 2.20, 'D2'),
+('Diclofenac 50mg', 340, 'Tablet', 2.75, 'A3'),
+('Ranitidine 150mg', 160, 'Tablet', 1.20, 'A5'),
+('Salbutamol Inhaler', 60, 'Inhaler', 120.00, 'E1'),
+('Cetaphil Moisturizer', 40, 'Topical', 250.00, 'F1'),
+('Insulin Human 100IU/ml', 30, 'Injection', 550.00, 'G1');
+
+INSERT INTO customer VALUES
+(200001, 'Walkin', 'Customer', 30, 'F', '9000000001', 'walkin@local'),
+(200002, 'Ravi', 'Kumar', 35, 'M', '9000000003', 'ravi.k@example.com'),
+(200003, 'Meera', 'Shah', 28, 'F', '9000000004', 'meera.shah@gmail.com'),
+(200004, 'Amit', 'Singh', 42, 'M', '9000000005', 'amit.s@mail.com'),
+(200005, 'Sita', 'Devi', 50, 'F', '9000000006', 'sita.devi@mail.com'),
+(200006, 'Walkin2', 'Guest', 22, 'M', '9000000007', 'guest2@local');
+
+INSERT INTO employee (E_Fname, E_Lname, E_Bdate, E_Age, E_Sex, E_Type, E_Date, E_Add, E_Mail, E_Phone, E_Sal) VALUES
+('S','Admin', '2000-01-01', 25, 'F', 'Pharmacist', CURDATE(), 'Store Address','s@store.com','9000000002',15000),
+('K','Manager', '1990-05-12', 35, 'M', 'Manager', CURDATE(), 'Main Branch','k.manager@store.com','9000000010',30000),
+('N','Assistant', '1998-03-20', 27, 'F', 'Assistant', CURDATE(), 'Main Branch','n.assist@store.com','9000000020',12000);
+
+INSERT INTO emplogin VALUES
+('s_admin','s_pass',1),
+('k_manager','k_pass',2),
+('n_assist','n_pass',3);
+
+INSERT INTO purchase (Med_ID, Sup_ID, P_Qty, P_Cost, P_Date, Mfg_Date, Exp_Date) VALUES
+(1, 1, 500, 400.00, '2025-06-01', '2025-05-01', '2027-05-01'),
+(2, 2, 200, 350.00, '2025-07-10', '2025-06-15', '2026-12-15'),
+(3, 3, 100, 450.00, '2025-08-05', '2025-07-01', '2026-07-01'),
+(4, 1, 600, 700.00, '2025-04-20', '2025-03-18', '2027-03-18'),
+(5, 4, 200, 1200.00, '2025-09-08', '2025-08-10', '2026-08-10'),
+(6, 2, 1000, 500.00, '2025-01-12', '2024-12-01', '2026-12-01'),
+(7, 3, 400, 1600.00, '2025-02-15', '2025-01-10', '2026-01-10'),
+(8, 4, 180, 900.00, '2025-03-22', '2025-02-01', '2026-02-01'),
+(9, 5, 300, 900.00, '2025-05-30', '2025-04-15', '2026-04-15'),
+(10, 5, 220, 200.00, '2025-06-14', '2025-05-01', '2027-05-01'),
+(11, 6, 250, 1625.00, '2025-08-28', '2025-07-01', '2026-07-01'),
+(12, 1, 800, 720.00, '2025-09-30', '2025-08-10', '2026-08-10'),
+(13, 2, 150, 1800.00, '2025-10-01', '2025-09-01', '2026-09-01'),
+(14, 3, 600, 300.00, '2025-01-18', '2024-12-15', '2026-12-15'),
+(15, 4, 120, 264.00, '2025-07-21', '2025-06-10', '2026-06-10'),
+(16, 2, 340, 935.00, '2025-03-05', '2025-02-02', '2026-02-02'),
+(17, 6, 180, 216.00, '2025-04-10', '2025-03-01', '2026-03-01'),
+(18, 1, 75, 9000.00, '2025-09-11', '2025-08-01', '2026-08-01'),
+(19, 5, 50, 12500.00, '2025-03-03', '2025-02-01', '2026-02-01'),
+(20, 3, 40, 22000.00, '2025-06-06', '2025-05-01', '2026-05-01'),
+(5, NULL, 50, 300.00, '2025-11-01', '2025-10-01', '2026-10-01');
+
+INSERT INTO sales (C_ID, E_ID) VALUES
+(200001,1),
+(200002,2),
+(200003,3),
+(200004,2),
+(200005,1),
+(200006,3),
+(200002,1);
+
+INSERT INTO sales_items (SALE_ID, MED_ID, SALE_QTY) VALUES
+(1, 1, 2),
+(1, 12, 3),
+(1, 14, 1),
+(2, 6, 4),
+(2, 11, 1),
+(3, 7, 2),
+(3, 13, 1),
+(3, 2, 1),
+(4, 18, 1),
+(4, 9, 2),
+(5, 19, 1),
+(5, 20, 1),
+(5, 3, 2),
+(6, 4, 5),
+(6, 16, 2),
+(7, 10, 3),
+(7, 15, 2),
+(7, 12, 1);
 
---
--- Table structure for table `admin`
---
-
-CREATE TABLE `admin` (
-  `ID` decimal(7,0) NOT NULL,
-  `A_USERNAME` varchar(50) NOT NULL,
-  `A_PASSWORD` varchar(50) NOT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
---
--- Dumping data for table `admin`
---
-
-INSERT INTO `admin` (`ID`, `A_USERNAME`, `A_PASSWORD`) VALUES
-('1', 'alex_admin', 'password');
-
--- --------------------------------------------------------
-
---
--- Table structure for table `customer`
---
-
-CREATE TABLE `customer` (
-  `C_ID` decimal(6,0) NOT NULL,
-  `C_FNAME` varchar(30) NOT NULL,
-  `C_LNAME` varchar(30) DEFAULT NULL,
-  `C_AGE` int(11) NOT NULL,
-  `C_SEX` varchar(6) NOT NULL,
-  `C_PHNO` decimal(10,0) NOT NULL,
-  `C_MAIL` varchar(40) DEFAULT NULL
-) ;
-
---
--- Dumping data for table `customer`
---
-
-INSERT INTO `customer` (`C_ID`, `C_FNAME`, `C_LNAME`, `C_AGE`, `C_SEX`, `C_PHNO`, `C_MAIL`) VALUES
-('987101', 'Aisha', 'Khan', 22, 'Female', '9632587415', 'aisha.khan@gmail.com'),
-('987102', 'Mateo', 'Rossi', 24, 'Male', '9987565423', 'mateo.rossi@gmail.com'),
-('987103', 'Linh', 'Tran', 45, 'Female', '7896541236', 'linh.tran@hotmail.com'),
-('987104', 'Sofia', 'Martinez', 30, 'Female', '7845129635', 'sofia.martinez@gmail.com'),
-('987105', 'Omar', 'Haddad', 40, 'Male', '6789541235', 'omar.haddad@hotmail.com'),
-('987106', 'Priya', 'Patel', 60, 'Male', '8996574123', 'priya.patel@yahoo.com'),
-('987107', 'Chloe', 'Nguyen', 35, 'Female', '7845963259', 'chloe.nguyen@gmail.com');
-
--- --------------------------------------------------------
-
---
--- Table structure for table `emplogin`
---
-
-CREATE TABLE `emplogin` (
-  `E_ID` decimal(7,0) NOT NULL,
-  `E_USERNAME` varchar(20) NOT NULL,
-  `E_PASS` varchar(30) NOT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
---
--- Dumping data for table `emplogin`
---
-
-INSERT INTO `emplogin` (`E_ID`, `E_USERNAME`, `E_PASS`) VALUES
-('4567005', 'maya', 'pass1'),
-('4567002', 'emma', 'pass2'),
-('4567010', 'ethan', 'pass3'),
-('4567003', 'liam', 'pass4'),
-('4567009', 'sara', 'pass5'),
-('4567006', 'danielp', 'pass6'),
-('4567001', 'nina', 'pass7');
-
--- --------------------------------------------------------
-
---
--- Table structure for table `employee`
---
-
-CREATE TABLE `employee` (
-  `E_ID` decimal(7,0) NOT NULL,
-  `E_FNAME` varchar(30) NOT NULL,
-  `E_LNAME` varchar(30) DEFAULT NULL,
-  `BDATE` date NOT NULL,
-  `E_AGE` int(11) NOT NULL,
-  `E_SEX` varchar(6) NOT NULL,
-  `E_TYPE` varchar(20) NOT NULL,
-  `E_JDATE` date NOT NULL,
-  `E_SAL` decimal(8,2) NOT NULL,
-  `E_PHNO` decimal(10,0) NOT NULL,
-  `E_MAIL` varchar(40) DEFAULT NULL,
-  `E_ADD` varchar(40) DEFAULT NULL
-) ;
-
---
--- Dumping data for table `employee`
---
-
-INSERT INTO `employee` (`E_ID`, `E_FNAME`, `E_LNAME`, `BDATE`, `E_AGE`, `E_SEX`, `E_TYPE`, `E_JDATE`, `E_SAL`, `E_PHNO`, `E_MAIL`, `E_ADD`) VALUES
-('1', 'Alex', 'Morgan', '1989-05-24', 30, 'Female', 'Admin', '2009-06-24', '95000.00', '9874563219', 'alex.morgan@pharmacia.com', 'Chennai'),
-('4567001', 'Nina', 'Kumar', '1995-10-05', 25, 'Female', 'Pharmacist', '2017-11-12', '25000.00', '9967845123', 'nina.kumar@hotmail.com', 'Thiruvanmiyur'),
-('4567002', 'Emma', 'Johnson', '2000-10-03', 20, 'Female', 'Pharmacist', '2012-10-06', '45000.00', '8546123566', 'emma.johnson@gmail.com', 'Adyar'),
-('4567003', 'Liam', 'OConnor', '1998-02-01', 22, 'Male', 'Pharmacist', '2019-07-06', '21000.00', '7854123694', 'liam.oconnor@live.com', 'T.Nagar'),
-('4567005', 'Maya', 'Gonzalez', '1992-01-02', 28, 'Female', 'Pharmacist', '2017-05-16', '32000.00', '7894532165', 'maya.gonzalez@gmail.com', 'Kottivakkam'),
-('4567006', 'Daniel', 'Park', '1999-12-11', 20, 'Male', 'Pharmacist', '2018-09-05', '28000.00', '7896541234', 'daniel.park@hotmail.com', 'Porur'),
-('4567009', 'Sara', 'Alvarez', '1980-02-28', 40, 'Female', 'Manager', '2010-05-06', '80000.00', '7854123695', 'sara.alvarez@gmail.com', 'Adyar'),
-('4567010', 'Ethan', 'Brown', '1993-04-05', 27, 'Male', 'Pharmacist', '2016-01-05', '30000.00', '7896541235', 'ethan.brown@gmail.com', 'Kodambakkam');
-
--- --------------------------------------------------------
-
---
--- Table structure for table `meds`
---
-
-CREATE TABLE `meds` (
-  `MED_ID` decimal(6,0) NOT NULL,
-  `MED_NAME` varchar(50) NOT NULL,
-  `MED_QTY` int(11) NOT NULL,
-  `CATEGORY` varchar(20) DEFAULT NULL,
-  `MED_PRICE` decimal(6,2) NOT NULL,
-  `LOCATION_RACK` varchar(30) DEFAULT NULL
-) ;
-
---
--- Dumping data for table `meds`
---
-
-INSERT INTO `meds` (`MED_ID`, `MED_NAME`, `MED_QTY`, `CATEGORY`, `MED_PRICE`, `LOCATION_RACK`) VALUES
-('123001', 'Dolo 650 MG', 625, 'Tablet', '1.00', 'rack 5'),
-('123002', 'Panadol Cold & Flu', 90, 'Tablet', '2.50', 'rack 6'),
-('123003', 'Livogen', 25, 'Capsule', '5.00', 'rack 3'),
-('123004', 'Gelusil', 440, 'Tablet', '1.25', 'rack 4'),
-('123005', 'Cyclopam', 120, 'Tablet', '6.00', 'rack 2'),
-('123006', 'Benadryl 200 ML', 35, 'Syrup', '50.00', 'rack 10'),
-('123007', 'Lopamide', 15, 'Capsule', '5.00', 'rack 7'),
-('123008', 'Vitamic C', 90, 'Tablet', '3.00', 'rack 8'),
-('123009', 'Omeprazole', 35, 'Capsule', '4.00', 'rack 3'),
-('123010', 'Concur 5 MG', 600, 'Tablet', '3.50', 'rack 9'),
-('123011', 'Augmentin 250 ML', 115, 'Syrup', '80.00', 'rack 7');
-
--- --------------------------------------------------------
-
---
--- Table structure for table `purchase`
---
-
-CREATE TABLE `purchase` (
-  `P_ID` decimal(4,0) NOT NULL,
-  `SUP_ID` decimal(3,0) NOT NULL,
-  `MED_ID` decimal(6,0) NOT NULL,
-  `P_QTY` int(11) NOT NULL,
-  `P_COST` decimal(8,2) NOT NULL,
-  `PUR_DATE` date NOT NULL,
-  `MFG_DATE` date NOT NULL,
-  `EXP_DATE` date NOT NULL
-) ;
-
---
--- Dumping data for table `purchase`
---
-
-INSERT INTO `purchase` (`P_ID`, `SUP_ID`, `MED_ID`, `P_QTY`, `P_COST`, `PUR_DATE`, `MFG_DATE`, `EXP_DATE`) VALUES
-('1001', '136', '123010', 200, '1500.50', '2020-03-01', '2019-05-05', '2021-05-10'),
-('1002', '123', '123002', 1000, '3000.00', '2020-02-01', '2018-06-01', '2020-12-05'),
-('1003', '145', '123006', 20, '800.00', '2020-04-22', '2017-02-05', '2020-07-01'),
-('1004', '156', '123004', 250, '1000.00', '2020-04-02', '2020-05-06', '2023-05-06'),
-('1005', '123', '123005', 200, '1200.00', '2020-02-01', '2019-08-02', '2021-04-01'),
-('1006', '162', '123010', 500, '1500.00', '2019-04-22', '2018-01-01', '2020-05-02'),
-('1007', '123', '123001', 500, '450.00', '2020-01-02', '2019-01-05', '2022-03-06');
-
---
--- Triggers `purchase`
---
-DELIMITER $$
-CREATE TRIGGER `QTYDELETE` AFTER DELETE ON `purchase` FOR EACH ROW BEGIN
-UPDATE meds SET MED_QTY=MED_QTY-old.P_QTY WHERE meds.MED_ID=old.MED_ID;
-END
-$$
-DELIMITER ;
-DELIMITER $$
-CREATE TRIGGER `QTYINSERT` AFTER INSERT ON `purchase` FOR EACH ROW BEGIN
-UPDATE meds SET MED_QTY=MED_QTY+new.P_QTY WHERE meds.MED_ID=new.MED_ID;
-END
-$$
-DELIMITER ;
-DELIMITER $$
-CREATE TRIGGER `QTYUPDATE` AFTER UPDATE ON `purchase` FOR EACH ROW BEGIN
-UPDATE meds SET MED_QTY=MED_QTY-old.P_QTY WHERE meds.MED_ID=new.MED_ID;
-UPDATE meds SET MED_QTY=MED_QTY+new.P_QTY WHERE meds.MED_ID=new.MED_ID;
-END
-$$
-DELIMITER ;
-
--- --------------------------------------------------------
-
---
--- Table structure for table `sales`
---
-
-CREATE TABLE `sales` (
-  `SALE_ID` int(11) NOT NULL,
-  `C_ID` decimal(6,0) NOT NULL,
-  `S_DATE` date DEFAULT NULL,
-  `S_TIME` time DEFAULT NULL,
-  `TOTAL_AMT` decimal(8,2) DEFAULT NULL,
-  `E_ID` decimal(7,0) NOT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
---
--- Dumping data for table `sales`
---
-
-INSERT INTO `sales` (`SALE_ID`, `C_ID`, `S_DATE`, `S_TIME`, `TOTAL_AMT`, `E_ID`) VALUES
-(1, '987101', '2020-04-15', '13:23:03', '180.00', '4567009'),
-(2, '987106', '2020-04-21', '20:19:31', '585.00', '1'),
-(3, '987103', '2020-04-15', '11:23:53', '120.00', '4567010'),
-(4, '987104', '2020-04-14', '18:20:00', '955.00', '4567006'),
-(5, '987103', '2020-04-21', '15:24:43', '45.00', '1'),
-(6, '987102', '2020-03-11', '10:24:43', '140.00', '4567001'),
-(7, '987105', '2020-04-24', '00:25:54', '350.00', '1'),
-(8, '987104', '2020-04-24', '00:47:47', '35.00', '4567001'),
-(12, '987103', '2020-04-24', '19:33:16', '60.00', '1'),
-(13, '987104', '2020-04-24', '21:15:56', '62.50', '4567001'),
-(15, '987107', '2020-12-04', '18:39:46', '420.00', '1'),
-(16, '987106', '2020-12-04', '18:52:21', '30.00', '1'),
-(17, '987103', '2020-12-04', '19:35:56', '57.50', '1'),
-(18, '987105', '2020-12-04', '19:36:56', '160.00', '4567001'),
-(20, '987103', '2020-12-04', '22:53:18', '150.00', '4567001');
-
---
--- Triggers `sales`
---
-DELIMITER $$
-CREATE TRIGGER `SALE_ID_DELETE` BEFORE DELETE ON `sales` FOR EACH ROW BEGIN
-DELETE from sales_items WHERE sales_items.SALE_ID=old.SALE_ID;
-END
-$$
-DELIMITER ;
-
--- --------------------------------------------------------
-
---
--- Table structure for table `sales_items`
---
-
-CREATE TABLE `sales_items` (
-  `SALE_ID` int(11) NOT NULL,
-  `MED_ID` decimal(6,0) NOT NULL,
-  `SALE_QTY` int(11) NOT NULL,
-  `TOT_PRICE` decimal(8,2) NOT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
---
--- Dumping data for table `sales_items`
---
-
-INSERT INTO `sales_items` (`SALE_ID`, `MED_ID`, `SALE_QTY`, `TOT_PRICE`) VALUES
-(1, '123001', 20, '20.00'),
-(1, '123011', 2, '160.00'),
-(2, '123003', 75, '225.00'),
-(2, '123005', 60, '360.00'),
-(3, '123008', 40, '120.00'),
-(4, '123010', 250, '875.00'),
-(4, '123011', 1, '80.00'),
-(5, '123001', 45, '45.00'),
-(6, '123006', 2, '100.00'),
-(6, '123009', 10, '40.00'),
-(7, '123001', 100, '100.00'),
-(7, '123003', 50, '250.00'),
-(8, '123001', 10, '10.00'),
-(8, '123002', 10, '25.00'),
-(12, '123005', 10, '60.00'),
-(13, '123002', 25, '62.50'),
-(15, '123005', 45, '270.00'),
-(15, '123006', 3, '150.00'),
-(16, '123008', 10, '30.00'),
-(17, '123004', 10, '12.50'),
-(17, '123007', 5, '25.00'),
-(17, '123009', 5, '20.00'),
-(18, '123011', 2, '160.00'),
-(20, '123005', 25, '150.00');
-
---
--- Triggers `sales_items`
---
-DELIMITER $$
-CREATE TRIGGER `SALEDELETE` AFTER DELETE ON `sales_items` FOR EACH ROW BEGIN
-UPDATE meds SET MED_QTY=MED_QTY+old.SALE_QTY WHERE meds.MED_ID=old.MED_ID;
-END
-$$
-DELIMITER ;
-DELIMITER $$
-CREATE TRIGGER `SALEINSERT` AFTER INSERT ON `sales_items` FOR EACH ROW BEGIN
-UPDATE meds SET MED_QTY=MED_QTY-new.SALE_QTY WHERE meds.MED_ID=new.MED_ID;
-END
-$$
-DELIMITER ;
-
--- --------------------------------------------------------
-
---
--- Table structure for table `suppliers`
---
-
-CREATE TABLE `suppliers` (
-  `SUP_ID` decimal(3,0) NOT NULL,
-  `SUP_NAME` varchar(25) NOT NULL,
-  `SUP_ADD` varchar(30) NOT NULL,
-  `SUP_PHNO` decimal(10,0) NOT NULL,
-  `SUP_MAIL` varchar(40) NOT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
---
--- Dumping data for table `suppliers`
---
-
-INSERT INTO `suppliers` (`SUP_ID`, `SUP_NAME`, `SUP_ADD`, `SUP_PHNO`, `SUP_MAIL`) VALUES
-('123', 'Global Meds Ltd', 'Chennai, Tamil Nadu', '8745632145', 'contact@globalmeds.com'),
-('136', 'Northern Pharma', 'Trichy', '7894561235', 'info@northernpharma.com'),
-('145', 'Sunrise Pharmaceuticals', 'Hyderabad', '7854699321', 'sales@sunrisepharma.com'),
-('156', 'HealthCore', 'Chennai', '9874585236', 'support@healthcore.com'),
-('162', 'Wellness Distributors', 'Trichy', '7894561335', 'hello@wellnessdist.com');
-
---
--- Indexes for dumped tables
---
-
---
--- Indexes for table `admin`
---
-ALTER TABLE `admin`
-  ADD PRIMARY KEY (`A_USERNAME`),
-  ADD UNIQUE KEY `USERNAME` (`A_USERNAME`),
-  ADD KEY `ID` (`ID`);
-
---
--- Indexes for table `customer`
---
-ALTER TABLE `customer`
-  ADD PRIMARY KEY (`C_ID`),
-  ADD UNIQUE KEY `C_PHNO` (`C_PHNO`),
-  ADD UNIQUE KEY `C_MAIL` (`C_MAIL`);
-
---
--- Indexes for table `emplogin`
---
-ALTER TABLE `emplogin`
-  ADD PRIMARY KEY (`E_USERNAME`),
-  ADD KEY `E_ID` (`E_ID`);
-
---
--- Indexes for table `employee`
---
-ALTER TABLE `employee`
-  ADD PRIMARY KEY (`E_ID`);
-
---
--- Indexes for table `meds`
---
-ALTER TABLE `meds`
-  ADD PRIMARY KEY (`MED_ID`);
-
---
--- Indexes for table `purchase`
---
-ALTER TABLE `purchase`
-  ADD PRIMARY KEY (`P_ID`,`MED_ID`),
-  ADD KEY `SUP_ID` (`SUP_ID`),
-  ADD KEY `MED_ID` (`MED_ID`);
-
---
--- Indexes for table `sales`
---
-ALTER TABLE `sales`
-  ADD PRIMARY KEY (`SALE_ID`),
-  ADD KEY `C_ID` (`C_ID`),
-  ADD KEY `E_ID` (`E_ID`);
-
---
--- Indexes for table `sales_items`
---
-ALTER TABLE `sales_items`
-  ADD PRIMARY KEY (`SALE_ID`,`MED_ID`),
-  ADD KEY `MED_ID` (`MED_ID`);
-
---
--- Indexes for table `suppliers`
---
-ALTER TABLE `suppliers`
-  ADD PRIMARY KEY (`SUP_ID`);
-
---
--- AUTO_INCREMENT for dumped tables
---
-
---
--- AUTO_INCREMENT for table `sales`
---
-ALTER TABLE `sales`
-  MODIFY `SALE_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=21;
-
---
--- Constraints for dumped tables
---
-
---
--- Constraints for table `admin`
---
-ALTER TABLE `admin`
-  ADD CONSTRAINT `admin_ibfk_1` FOREIGN KEY (`ID`) REFERENCES `employee` (`E_ID`);
-
---
--- Constraints for table `emplogin`
---
-ALTER TABLE `emplogin`
-  ADD CONSTRAINT `emplogin_ibfk_1` FOREIGN KEY (`E_ID`) REFERENCES `employee` (`E_ID`);
-
---
--- Constraints for table `purchase`
---
-ALTER TABLE `purchase`
-  ADD CONSTRAINT `purchase_ibfk_1` FOREIGN KEY (`SUP_ID`) REFERENCES `suppliers` (`SUP_ID`),
-  ADD CONSTRAINT `purchase_ibfk_2` FOREIGN KEY (`MED_ID`) REFERENCES `meds` (`MED_ID`);
-
---
--- Constraints for table `sales`
---
-ALTER TABLE `sales`
-  ADD CONSTRAINT `sales_ibfk_1` FOREIGN KEY (`C_ID`) REFERENCES `customer` (`C_ID`),
-  ADD CONSTRAINT `sales_ibfk_2` FOREIGN KEY (`E_ID`) REFERENCES `employee` (`E_ID`);
-
---
--- Constraints for table `sales_items`
---
-ALTER TABLE `sales_items`
-  ADD CONSTRAINT `sales_items_ibfk_1` FOREIGN KEY (`SALE_ID`) REFERENCES `sales` (`SALE_ID`),
-  ADD CONSTRAINT `sales_items_ibfk_2` FOREIGN KEY (`MED_ID`) REFERENCES `meds` (`MED_ID`);
-COMMIT;
-
-/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
-/*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
-/*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
+SELECT 'pharmacy schema ready' AS status;
