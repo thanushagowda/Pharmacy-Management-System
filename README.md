@@ -13,7 +13,7 @@ It uses SQL tables with foreign keys, triggers, and functions to automate stock 
 
 ---
 
-## **📁 Repository Contents**
+## ** Repository Contents**
 
 * **/PHARMACY** – PHP front-end pages
 * **pharmacy.sql** – SQL dump (tables, triggers, functions, sample data)
@@ -23,7 +23,7 @@ It uses SQL tables with foreign keys, triggers, and functions to automate stock 
 
 ---
 
-## **⚙️ Technologies Used**
+## ** Technologies Used**
 
 * PHP
 * HTML, CSS, Bootstrap
@@ -35,7 +35,7 @@ It uses SQL tables with foreign keys, triggers, and functions to automate stock 
 
 ---
 
-## **🚀 How to Run the Project**
+## ** How to Run the Project**
 
 1. Install and open **XAMPP**.
 2. Start **Apache** and **MySQL** from the control panel.
