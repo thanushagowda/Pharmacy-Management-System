@@ -1,11 +1,4 @@
--- phpMyAdmin SQL Dump
--- version 5.0.1
--- https://www.phpmyadmin.net/
---
--- Host: 127.0.0.1
--- Generation Time: Dec 04, 2020 at 06:39 PM
--- Server version: 10.4.11-MariaDB
--- PHP Version: 7.2.28
+
 
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
 SET AUTOCOMMIT = 0;
@@ -107,7 +100,7 @@ CREATE TABLE `admin` (
 --
 
 INSERT INTO `admin` (`ID`, `A_USERNAME`, `A_PASSWORD`) VALUES
-('1', 'admin', 'password');
+('1', 'alex_admin', 'password');
 
 -- --------------------------------------------------------
 
@@ -130,13 +123,13 @@ CREATE TABLE `customer` (
 --
 
 INSERT INTO `customer` (`C_ID`, `C_FNAME`, `C_LNAME`, `C_AGE`, `C_SEX`, `C_PHNO`, `C_MAIL`) VALUES
-('987101', 'Safia', 'Malik', 22, 'Female', '9632587415', 'safia@gmail.com'),
-('987102', 'Varun', 'Ilango', 24, 'Male', '9987565423', 'varun@gmail.com'),
-('987103', 'Suja', 'Suresh', 45, 'Female', '7896541236', 'suja@hotmail.com'),
-('987104', 'Agatha', 'Elizabeth', 30, 'Female', '7845129635', 'agatha@gmail.com'),
-('987105', 'Zayed', 'Shah', 40, 'Male', '6789541235', 'zshah@hotmail.com'),
-('987106', 'Vijay', 'Kumar', 60, 'Male', '8996574123', 'vijayk@yahoo.com'),
-('987107', 'Meera', 'Das', 35, 'Female', '7845963259', 'meera@gmail.com');
+('987101', 'Aisha', 'Khan', 22, 'Female', '9632587415', 'aisha.khan@gmail.com'),
+('987102', 'Mateo', 'Rossi', 24, 'Male', '9987565423', 'mateo.rossi@gmail.com'),
+('987103', 'Linh', 'Tran', 45, 'Female', '7896541236', 'linh.tran@hotmail.com'),
+('987104', 'Sofia', 'Martinez', 30, 'Female', '7845129635', 'sofia.martinez@gmail.com'),
+('987105', 'Omar', 'Haddad', 40, 'Male', '6789541235', 'omar.haddad@hotmail.com'),
+('987106', 'Priya', 'Patel', 60, 'Male', '8996574123', 'priya.patel@yahoo.com'),
+('987107', 'Chloe', 'Nguyen', 35, 'Female', '7845963259', 'chloe.nguyen@gmail.com');
 
 -- --------------------------------------------------------
 
@@ -155,13 +148,13 @@ CREATE TABLE `emplogin` (
 --
 
 INSERT INTO `emplogin` (`E_ID`, `E_USERNAME`, `E_PASS`) VALUES
-('4567005', 'amaya', 'pass1'),
-('4567002', 'anita', 'pass2'),
-('4567010', 'daniel', 'pass3'),
-('4567003', 'harish', 'pass4'),
-('4567009', 'shayla', 'pass5'),
-('4567006', 'shoaib', 'pass6'),
-('4567001', 'varshini', 'pass7');
+('4567005', 'maya', 'pass1'),
+('4567002', 'emma', 'pass2'),
+('4567010', 'ethan', 'pass3'),
+('4567003', 'liam', 'pass4'),
+('4567009', 'sara', 'pass5'),
+('4567006', 'danielp', 'pass6'),
+('4567001', 'nina', 'pass7');
 
 -- --------------------------------------------------------
 
@@ -189,14 +182,14 @@ CREATE TABLE `employee` (
 --
 
 INSERT INTO `employee` (`E_ID`, `E_FNAME`, `E_LNAME`, `BDATE`, `E_AGE`, `E_SEX`, `E_TYPE`, `E_JDATE`, `E_SAL`, `E_PHNO`, `E_MAIL`, `E_ADD`) VALUES
-('1', 'Admin', '-', '1989-05-24', 30, 'Female', 'Admin', '2009-06-24', '95000.00', '9874563219', 'admin@pharmacia.com', 'Chennai'),
-('4567001', 'Varshini', 'Elangovan', '1995-10-05', 25, 'Female', 'Pharmacist', '2017-11-12', '25000.00', '9967845123', 'evarsh@hotmail.com', 'Thiruvanmiyur'),
-('4567002', 'Anita', 'Shree', '2000-10-03', 20, 'Female', 'Pharmacist', '2012-10-06', '45000.00', '8546123566', 'anita@gmail.com', 'Adyar'),
-('4567003', 'Harish', 'Raja', '1998-02-01', 22, 'Male', 'Pharmacist', '2019-07-06', '21000.00', '7854123694', 'harishraja@live.com', 'T.Nagar'),
-('4567005', 'Amaya', 'Singh', '1992-01-02', 28, 'Female', 'Pharmacist', '2017-05-16', '32000.00', '7894532165', 'amaya@gmail.com', 'Kottivakkam'),
-('4567006', 'Shoaib', 'Ahmed', '1999-12-11', 20, 'Male', 'Pharmacist', '2018-09-05', '28000.00', '7896541234', 'shoaib@hotmail.com', 'Porur'),
-('4567009', 'Shayla', 'Hussain', '1980-02-28', 40, 'Female', 'Manager', '2010-05-06', '80000.00', '7854123695', 'shaylah@gmail.com', 'Adyar'),
-('4567010', 'Daniel', 'James', '1993-04-05', 27, 'Male', 'Pharmacist', '2016-01-05', '30000.00', '7896541235', 'daniels@gmail.com', 'Kodambakkam');
+('1', 'Alex', 'Morgan', '1989-05-24', 30, 'Female', 'Admin', '2009-06-24', '95000.00', '9874563219', 'alex.morgan@pharmacia.com', 'Chennai'),
+('4567001', 'Nina', 'Kumar', '1995-10-05', 25, 'Female', 'Pharmacist', '2017-11-12', '25000.00', '9967845123', 'nina.kumar@hotmail.com', 'Thiruvanmiyur'),
+('4567002', 'Emma', 'Johnson', '2000-10-03', 20, 'Female', 'Pharmacist', '2012-10-06', '45000.00', '8546123566', 'emma.johnson@gmail.com', 'Adyar'),
+('4567003', 'Liam', 'OConnor', '1998-02-01', 22, 'Male', 'Pharmacist', '2019-07-06', '21000.00', '7854123694', 'liam.oconnor@live.com', 'T.Nagar'),
+('4567005', 'Maya', 'Gonzalez', '1992-01-02', 28, 'Female', 'Pharmacist', '2017-05-16', '32000.00', '7894532165', 'maya.gonzalez@gmail.com', 'Kottivakkam'),
+('4567006', 'Daniel', 'Park', '1999-12-11', 20, 'Male', 'Pharmacist', '2018-09-05', '28000.00', '7896541234', 'daniel.park@hotmail.com', 'Porur'),
+('4567009', 'Sara', 'Alvarez', '1980-02-28', 40, 'Female', 'Manager', '2010-05-06', '80000.00', '7854123695', 'sara.alvarez@gmail.com', 'Adyar'),
+('4567010', 'Ethan', 'Brown', '1993-04-05', 27, 'Male', 'Pharmacist', '2016-01-05', '30000.00', '7896541235', 'ethan.brown@gmail.com', 'Kodambakkam');
 
 -- --------------------------------------------------------
 
@@ -407,11 +400,11 @@ CREATE TABLE `suppliers` (
 --
 
 INSERT INTO `suppliers` (`SUP_ID`, `SUP_NAME`, `SUP_ADD`, `SUP_PHNO`, `SUP_MAIL`) VALUES
-('123', 'XYZ Pharmaceuticals', 'Chennai, Tamil Nadu', '8745632145', 'xyz@xyzpharma.com'),
-('136', 'ABC PharmaSupply', 'Trichy', '7894561235', 'abc@pharmsupp.com'),
-('145', 'Daily Pharma Ltd', 'Hyderabad', '7854699321', 'daily@dpharma.com'),
-('156', 'MedAll', 'Chennai', '9874585236', 'mainid@medall.com'),
-('162', 'MedHead Pharmaceuticals', 'Trichy', '7894561335', 'abc@pharmsupp.com');
+('123', 'Global Meds Ltd', 'Chennai, Tamil Nadu', '8745632145', 'contact@globalmeds.com'),
+('136', 'Northern Pharma', 'Trichy', '7894561235', 'info@northernpharma.com'),
+('145', 'Sunrise Pharmaceuticals', 'Hyderabad', '7854699321', 'sales@sunrisepharma.com'),
+('156', 'HealthCore', 'Chennai', '9874585236', 'support@healthcore.com'),
+('162', 'Wellness Distributors', 'Trichy', '7894561335', 'hello@wellnessdist.com');
 
 --
 -- Indexes for dumped tables
